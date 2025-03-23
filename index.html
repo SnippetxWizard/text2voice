@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Text to Speech Generator</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --text-color: #333;
+            --bg-color: #f5f6fa;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, var(--bg-color) 0%, #dfe4ea 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            width: 100%;
+            max-width: 600px;
+            overflow: hidden;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 1rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            resize: vertical;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+        }
+
+        .controls {
+            display: grid;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            color: var(--text-color);
+            font-weight: 500;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: #ddd;
+            height: 8px;
+            border-radius: 4px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--secondary-color);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        button {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 25px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .speak-btn {
+            background: var(--secondary-color);
+        }
+
+        .stop-btn {
+            background: var(--accent-color);
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 1rem;
+            color: var(--text-color);
+            font-style: italic;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .status.active {
+            opacity: 1;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Text to Speech Generator</h1>
+        <div class="input-group">
+            <textarea id="textInput" placeholder="Enter your text here..."></textarea>
+        </div>
+        <div class="controls">
+            <div class="control-group">
+                <label for="voiceSelect">Select Voice:</label>
+                <select id="voiceSelect"></select>
+            </div>
+            <div class="control-group">
+                <label for="rate">Speed: <span id="rateValue">1</span>x</label>
+                <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
+            </div>
+            <div class="control-group">
+                <label for="pitch">Pitch: <span id="pitchValue">1</span></label>
+                <input type="range" id="pitch" min="0" max="2" step="0.1" value="1">
+            </div>
+        </div>
+        <div class="button-group">
+            <button class="speak-btn" id="speakBtn">Speak</button>
+            <button class="stop-btn" id="stopBtn">Stop</button>
+        </div>
+        <div class="status" id="status">Ready</div>
+    </div>
+
+    <script>
+        const synth = window.speechSynthesis;
+        const textInput = document.getElementById('textInput');
+        const voiceSelect = document.getElementById('voiceSelect');
+        const rate = document.getElementById('rate');
+        const pitch = document.getElementById('pitch');
+        const rateValue = document.getElementById('rateValue');
+        const pitchValue = document.getElementById('pitchValue');
+        const speakBtn = document.getElementById('speakBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+
+        let voices = [];
+
+        function populateVoices() {
+            voices = synth.getVoices();
+            voiceSelect.innerHTML = voices
+                .map((voice, index) => 
+                    `<option value="${index}">${voice.name} (${voice.lang})</option>`
+                )
+                .join('');
+        }
+
+        function updateStatus(message) {
+            status.textContent = message;
+            status.classList.add('active');
+            setTimeout(() => status.classList.remove('active'), 2000);
+        }
+
+        function speak() {
+            if (synth.speaking) {
+                synth.cancel();
+            }
+
+            const text = textInput.value.trim();
+            if (!text) {
+                updateStatus('Please enter some text');
+                return;
+            }
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            const selectedVoice = voices[voiceSelect.value];
+            utterance.voice = selectedVoice;
+            utterance.rate = parseFloat(rate.value);
+            utterance.pitch = parseFloat(pitch.value);
+
+            utterance.onstart = () => updateStatus('Speaking...');
+            utterance.onend = () => updateStatus('Finished');
+            utterance.onerror = (e) => updateStatus(`Error: ${e.error}`);
+
+            synth.speak(utterance);
+        }
+
+        // Event Listeners
+        synth.onvoiceschanged = populateVoices;
+        populateVoices();
+
+        rate.oninput = () => rateValue.textContent = rate.value;
+        pitch.oninput = () => pitchValue.textContent = pitch.value;
+
+        speakBtn.onclick = speak;
+        stopBtn.onclick = () => {
+            synth.cancel();
+            updateStatus('Stopped');
+        };
+
+        textInput.oninput = () => {
+            if (!textInput.value) {
+                updateStatus('Ready');
+            }
+        };
+    </script>
+</body>
+</html>
